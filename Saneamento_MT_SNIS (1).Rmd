@@ -1,0 +1,465 @@
+---
+title: "Relatório de Saneamento Básico"
+author: "Camily Nunes dos Santos"
+date: "2024-09-26"
+---
+
+# 2º ETAPA: Explorar e pensar em como utilizar os dados do SNIS no relatório.   
+
+#   
+
+# 1. Preparar o ambiente de trabalho  
+
+Criar uma pasta de trabalho: O código começa configurando o diretório de trabalho, onde estarão os arquivos de dados e onde os resultados serão salvos.
+
+Dica: Session \> Set Working Directory \> Choose Directory
+
+```{r}
+setwd("C:/Users/camir/OneDrive - Universidade Federal de Rondonópolis/LadyCamilyN/Produto_8") 
+```
+
+## 2. Instalar e carregar pacotes
+
+Instalar os pacotes (se necessário): Caso os pacotes ainda não estejam instalados, você pode instalar com os comandos abaixo:
+
+```{r}
+# Lista de pacotes necessários
+pacotes <- c("readxl", "ggplot2", "Amelia", "stringi", "stringr", "dplyr", "viridis", "ggrepel", "wesanderson", "RColorBrewer")
+```
+
+```{r}
+# Instalar os pacotes que ainda não estão instalados
+pacotes_nao_instalados <- pacotes[!(pacotes %in% installed.packages()[,"Package"])]
+if(length(pacotes_nao_instalados)) install.packages(pacotes_nao_instalados)
+
+# Carregar os pacotes, verificar se falha
+invisible(lapply(pacotes, function(pkg) {
+  if (!require(pkg, character.only = TRUE)) {
+    stop(paste("Falha ao carregar o pacote:", pkg))
+  }
+}))
+```
+
+## 
+
+## 3. Carregar os dados no R
+
+```{r}
+##Exemplo 1
+# Verificar se o arquivo existe antes de carregar
+caminho_arquivo <- "C:/Users/camir/OneDrive - Universidade Federal de Rondonópolis/LadyCamilyN/Produto_8/Dados/SNIS - Série Histórica/AgregadoSNISMT.xlsx"
+
+if (!file.exists(caminho_arquivo)) {
+  stop("Arquivo não encontrado no caminho especificado: ", caminho_arquivo)
+} else {
+  # Carregar os dados do arquivo Excel
+  agregado_snis_mt <- read_excel(caminho_arquivo)
+}
+```
+
+```{r}
+##Exemplo 2
+url <- "https://github.com/CamilyNunes/LadyCamilyN.git/Produto_8/Dados/SNIS - Série Histórica"
+
+dados <- read.csv(url)
+```
+
+## 
+
+## 4. Desabilitar notação científica
+
+Para garantir que os números não sejam representados em notação científica:
+
+```{r}
+options(scipen=999) 
+```
+
+## 5. Definir tema personalizado para gráficos (ggplot2)
+
+Tema dos Gráficos:
+
+```{r}
+# Função para gerar e salvar gráficos de séries temporais
+timePlot <- function(dataTime, legendaVar, chave) {
+  
+  # Criar gráfico básico de linha
+  plot <- ggplot(data = dataTime, aes(x = tempo, y = x, group = 1)) +
+            geom_line(color = "#2F2F4F", size = 1) +
+            geom_label(aes(label = label), size = 3) +  # Use apenas 'label'
+            labs(x = "", y = legendaVar) +
+            scale_x_continuous(breaks = seq(1995, 2022)) +
+            tema_plot() %+replace% 
+            theme(
+              axis.text.x = element_text(size = 10, angle = 50, hjust = 1, vjust = .9, face = "plain"))
+  
+  # Agregar escala Y caso solicitado
+  if (chave == 'agregar') {
+    plot <- plot + scale_y_continuous(breaks = c(min(dataTime$x), mean(dataTime$x), max(dataTime$x)))
+  }
+  
+  # Salvar o gráfico em um arquivo PNG
+  ggsave(
+    filename = paste0('tempo_', cleanStr(legendaVar), '.png'), 
+    plot = plot, 
+    path = 'resultados',
+    width = 8,
+    height = 4,
+    units = 'in')
+  
+  return(plot)
+}
+```
+
+```{r}
+timePlot <- function(dataTime, legendaVar, chave) {
+  
+  # Criar gráfico básico de linha com o tema minimalista
+  plot <- ggplot(data = dataTime, aes(x = tempo, y = x, group = 1)) +
+            geom_line(color = "#006400", size = 1.2) +  # Linha na cor verde-escura
+            geom_label(aes(label = label), size = 3, color = "#006400") +  # Rótulos em verde-escuro
+            labs(
+              title = "Evolução Temporal do Indicador",
+              subtitle = legendaVar,
+              x = "Ano",  # Legenda para o eixo X
+              y = legendaVar  # Legenda para o eixo Y
+            ) +
+            scale_x_continuous(breaks = seq(min(dataTime$tempo), max(dataTime$tempo), 5)) + # Quebra a cada 5 anos
+            scale_color_distiller(palette = "Greens", direction = 1) +  # Paleta de cores Greens
+            theme_minimal() %+replace%  # Manter um tema minimalista com os eixos
+            theme(
+              axis.title.x = element_text(size = 10, face = "bold", color = "black"),  # Legenda do eixo X
+              axis.title.y = element_text(size = 10, face = "bold", color = "black", angle = 90),  # Legenda Y na vertical
+              axis.text.x = element_text(size = 10, angle = 45, hjust = 1),  # Texto do eixo X com rotação
+              axis.text.y = element_text(size = 10),  # Texto do eixo Y
+              plot.title = element_text(size = 14, face = "bold", hjust = 0.5),  # Título centralizado
+              plot.subtitle = element_text(size = 12, hjust = 0.5),  # Subtítulo centralizado
+              panel.grid.major = element_line(color = "grey85"),  # Linhas de grid principais
+              panel.grid.minor = element_blank(),  # Remover grid secundário
+              legend.position = "none"  # Sem legenda adicional
+            )
+  
+  # Agregar escala Y caso solicitado
+  if (chave == 'agregar') {
+    plot <- plot + scale_y_continuous(breaks = c(min(dataTime$x), mean(dataTime$x), max(dataTime$x)))
+  }
+  
+  # Salvar o gráfico em um arquivo PNG
+  ggsave(
+    filename = paste0('tempo_', cleanStr(legendaVar), '.png'), 
+    plot = plot, 
+    path = 'resultados',
+    width = 8,
+    height = 4,
+    units = 'in'
+  )
+  
+  return(plot)
+}
+```
+ 
+```{r}
+timePlot <- function(dataTime, legendaVar, chave) {
+  
+  # Criar gráfico básico de linha com o tema minimalista
+  plot <- ggplot(data = dataTime, aes(x = tempo, y = x, group = 1)) +
+            geom_line(color = "#006400", size = 1.2) +  # Linha na cor verde-escura
+            geom_label(aes(label = label), size = 3, color = "#006400") +  # Rótulos em verde-escuro
+            labs(
+              title = "Evolução Temporal do Indicador",
+              subtitle = legendaVar,
+              x = "Ano",  # Legenda para o eixo X
+              y = legendaVar  # Legenda para o eixo Y
+            ) +
+            scale_x_continuous(breaks = dataTime$tempo) +  # Mostrar todos os anos disponíveis no banco
+            scale_color_distiller(palette = "Greens", direction = 1) +  # Paleta de cores Greens
+            theme_minimal() %+replace%  # Manter um tema minimalista com os eixos
+            theme(
+              axis.title.x = element_text(size = 10, face = "bold", color = "black"),  # Legenda do eixo X
+              axis.title.y = element_text(size = 10, face = "bold", color = "black", angle = 90),  # Legenda Y na vertical
+              axis.text.x = element_text(size = 10, angle = 45, hjust = 1),  # Texto do eixo X com rotação
+              axis.text.y = element_text(size = 10),  # Texto do eixo Y
+              plot.title = element_text(size = 14, face = "bold", hjust = 0.5),  # Título centralizado
+              plot.subtitle = element_text(size = 12, hjust = 0.5),  # Subtítulo centralizado
+              panel.grid.major = element_line(color = "grey85"),  # Linhas de grid principais
+              panel.grid.minor = element_blank(),  # Remover grid secundário
+              legend.position = "none"  # Sem legenda adicional
+            )
+  
+  # Agregar escala Y caso solicitado
+  if (chave == 'agregar') {
+    plot <- plot + scale_y_continuous(breaks = c(min(dataTime$x), mean(dataTime$x), max(dataTime$x)))
+  }
+  
+  # Salvar o gráfico em um arquivo PNG
+  ggsave(
+    filename = paste0('tempo_', cleanStr(legendaVar), '.png'), 
+    plot = plot, 
+    path = 'resultados',
+    width = 8,
+    height = 4,
+    units = 'in'
+  )
+  
+  return(plot)
+}
+
+```
+
+```{r}
+library(ggplot2)
+library(plotly)
+
+timePlot <- function(dataTime, legendaVar, chave) {
+  
+  # Criar gráfico básico de linha com o tema minimalista
+  plot <- ggplot(data = dataTime, aes(x = tempo, y = x, group = 1)) +
+            geom_line(color = "#006400", size = 1.2) +  # Linha na cor verde-escura
+            geom_label(aes(label = label), size = 3, color = "#006400") +  # Rótulos em verde-escuro
+            labs(
+              title = "Evolução Temporal do Indicador",
+              subtitle = legendaVar,
+              x = "Ano",  # Legenda para o eixo X
+              y = legendaVar  # Legenda para o eixo Y
+            ) +
+            scale_x_continuous(breaks = dataTime$tempo) +  # Mostrar todos os anos disponíveis no banco
+            scale_color_distiller(palette = "Greens", direction = 1) +  # Paleta de cores Greens
+            theme_minimal() %+replace%  # Manter um tema minimalista com os eixos
+            theme(
+              axis.title.x = element_text(size = 10, face = "bold", color = "black"),  # Legenda do eixo X
+              axis.title.y = element_text(size = 10, face = "bold", color = "black", angle = 90),  # Legenda Y na vertical
+              axis.text.x = element_text(size = 10, angle = 45, hjust = 1),  # Texto do eixo X com rotação
+              axis.text.y = element_text(size = 10),  # Texto do eixo Y
+              plot.title = element_text(size = 14, face = "bold", hjust = 0.5),  # Título centralizado
+              plot.subtitle = element_text(size = 12, hjust = 0.5),  # Subtítulo centralizado
+              panel.grid.major.x = element_blank(),  # Remover linhas de grid verticais
+              panel.grid.major.y = element_line(color = "grey85"),  # Manter apenas linhas de grid horizontais
+              panel.grid.minor = element_blank(),  # Remover grid secundário
+              legend.position = "none"  # Sem legenda adicional
+            )
+  
+  # Agregar escala Y caso solicitado
+  if (chave == 'agregar') {
+    plot <- plot + scale_y_continuous(breaks = c(min(dataTime$x), mean(dataTime$x), max(dataTime$x)))
+  }
+
+  # Converter o gráfico ggplot para interativo com plotly
+  interactive_plot <- ggplotly(plot)
+
+  # Salvar o gráfico em um arquivo PNG (opcional para versão estática)
+  ggsave(
+    filename = paste0('tempo_', cleanStr(legendaVar), '.png'), 
+    plot = plot, 
+    path = 'resultados',
+    width = 8,
+    height = 4,
+    units = 'in'
+  )
+  
+  return(interactive_plot)
+}
+```
+
+
+# TRATAMENTO DOS DADOS
+
+#===== criar base de dados =====#
+
+## 6. Tratar os dados do SNIS
+
+Certifique-se de que as colunas que você está tentando acessar realmente existem. Você pode usar `names(agregado_snis_mt)` para verificar os nomes das colunas disponíveis.
+
+```{r}
+# Verificar os nomes das colunas antes de selecioná-las
+print(names(agregado_snis_mt))
+```
+
+Selecionar colunas de interesse:
+
+```{r}
+# selecionar variaveis de referencia
+snis_data <- agregado_snis_mt[,c(1:10)]
+```
+
+```{r}
+# Adicionar indicadores de interesse a base 
+snis_data$AG001_pop_atendida_abastecimento_agua <- agregado_snis_mt$`AG001 - População total atendida com abastecimento de água`
+snis_data$IN022_consumo_percapita_litrohabdia <- agregado_snis_mt$`IN022 - Consumo médio percapita de água`
+snis_data$IN056_indice_de_coleta_esgoto <- agregado_snis_mt$`IN005 - Tarifa média de água`
+snis_data$IN016_indice_tratamento_esgoto_percentual <- agregado_snis_mt$`IN016 - Índice de tratamento de esgoto`
+snis_data$ES005_volume_esgoto_coletado_metro3 <- agregado_snis_mt$`ES005 - Volume de esgotos coletado`
+```
+
+
+## 7. Gráfico de mapa de valores ausentes (missing values)
+```{r}
+# Carregar pacotes necessários
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# 1. Criar uma função que calcula a proporção de valores omissos (NA) por coluna
+calc_missing_proportion <- function(df) {
+  # Para cada coluna, calcula a proporção de valores ausentes
+  missing_data <- sapply(df, function(col) {
+    mean(is.na(col))
+  })
+  
+  # Converter o vetor de proporções em um data frame
+  missing_df <- data.frame(
+    Atributo = names(missing_data),      # Nomes das colunas (atributos)
+    ProporcaoOmissos = missing_data      # Proporção de valores omissos
+  )
+  
+  # Filtrar apenas as colunas que possuem dados ausentes (ProporcaoOmissos > 0)
+  missing_df <- missing_df %>%
+    filter(ProporcaoOmissos > 0)
+  
+  return(missing_df)
+}
+
+# 2. Calcular a proporção de valores omissos no conjunto de dados 'snis_data'
+missing_proportions <- calc_missing_proportion(snis_data)
+
+# 3. Preparar os dados para a plotagem em forma de gráfico de barra empilhada
+# Necessário pivotar os dados para a estrutura adequada ao ggplot2
+plot_data <- missing_proportions %>%
+  mutate(Presentes = 1 - ProporcaoOmissos) %>%  # Adicionar a coluna de valores presentes (1 - NA)
+  pivot_longer(cols = c(ProporcaoOmissos, Presentes), 
+               names_to = "Status", 
+               values_to = "Proporcao")
+
+# 4. Definir as cores de acordo com seu Tema dos Gráficos
+cor_omisso <- "#FF6347"    # Cor para valores omissos (por exemplo, vermelho claro)
+cor_presente <- "#006400"  # Cor para valores presentes (verde escuro, do seu tema gráfico)
+
+# 5. Criar o gráfico de coluna empilhada em 100%
+ggplot(plot_data, aes(x = Atributo, y = Proporcao, fill = Status)) +
+  geom_bar(stat = "identity", position = "fill") +  # Empilhar barras
+  scale_y_continuous(labels = scales::percent) +    # Mostrar valores percentuais no eixo Y
+  labs(
+    title = "Proporção de Valores Omissos por Atributo",
+    x = "Atributos",
+    y = "Proporção (%)") +
+  scale_fill_manual(values = c("ProporcaoOmissos" = cor_omisso, "Presentes" = cor_presente), 
+                    labels = c("Valores Presentes", "Valores Omissos")) +
+  theme_minimal() + 
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotacionar os rótulos do eixo X para melhor visualização
+    axis.title.x = element_text(size = 10, face = "bold", color = "black"),  # Alinhamento do tema
+    axis.title.y = element_text(size = 10, face = "bold", color = "black", angle = 90),
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5),
+    panel.grid.major = element_line(color = "grey85"),
+    panel.grid.minor = element_blank())
+```
+
+```{r}
+# Remove as linhas com valores ausentes
+snis_data <- snis_data[complete.cases(snis_data),]
+```
+
+
+
+## 8.Transforma a coluna 
+
+Esse código transforma a coluna Ano.de.Referência do dataframe snis_data em um formato numérico, caso ela esteja armazenada como um fator ou string (texto)
+
+```{r}
+snis_data$Ano.de.Referência <- as.numeric(as.character(snis_data$Ano.de.Referência))
+```
+
+
+# EVOLUCAO TEMPORAL DO INDICADOR NO ESTADO DE MT
+
+## 8. Extração da variável de interesse
+
+Armazena os dados da coluna 'IN022_consumo_percapita_litrohabdia' do dataset 'snis_data'
+
+A variável 'dataVar' contém o consumo per capita de água em litros por habitante por dia.
+
+```{r}
+dataVar = snis_data$IN022_consumo_percapita_litrohabdia
+```
+
+## 9. Armazenamento do dataset completo
+
+A variável 'data' recebe o dataset 'snis_data' completo. \# Isso permite o uso de todos os dados na análise subsequente.
+
+```{r}
+data = snis_data
+```
+
+## 10. Definição da legenda para gráficos
+
+Define a legenda para as visualizações que utilizam a variável 'dataVar'.
+
+A legenda indica que a variável representa o "Consumo Percapita de Água" em litros por habitante por dia.
+
+```{r}
+legendaVar = 'Consumo Percapita de Água (1/hab/dia)'
+```
+
+```{r}
+chave = 'media'
+```
+
+## 10. Funções de suporte para gráficos
+
+```{r}
+# Função para limpar strings, removendo espaços, caracteres especiais e acentos
+cleanStr <- function(string) {
+  
+  # Carregar pacotes necessários apenas uma vez
+  if (!require(stringi)) install.packages("stringi", quietly = TRUE)
+  if (!require(stringr)) install.packages("stringr", quietly = TRUE)
+  
+  # Limpar e normalizar a string
+  string <- str_replace_all(string, ' ', '_')
+  string <- str_replace_all(string, '-', '_')
+  string <- str_replace_all(string, '%', '')
+  string <- str_replace_all(string, '/', '_')
+  string <- stri_trans_general(string, "latin-ascii")
+  string <- tolower(string)
+  
+  return(string)
+}
+```
+
+
+```{r}
+dev01 <- function(data, dataVar, chave, legendaVar) {
+  
+  if (chave == 'agregar') {
+    # agregar valores
+    dataTime = aggregate(dataVar, by = list(tempo = as.numeric(data$Ano.de.Referência)), FUN = sum)
+  } else if (chave == 'media') {
+    # tirar media valores
+    dataTime = aggregate(dataVar, by = list(tempo = as.numeric(data$Ano.de.Referência)), FUN = mean)
+    dataTime$x = round(dataTime$x, 2)
+  } else {
+    stop("Chave não encontrada! Tente 'agregar' ou 'media'.")
+  }
+  
+  # label
+  dataTime$label = NA
+  dataTime$label[c(2, 6, 11, 16, 21)] <- dataTime$x[c(2, 6, 11, 16, 21)] 
+  
+  # A coluna 'x' precisa ser definida aqui
+  colnames(dataTime)[2] <- "x"  # Renomeia a coluna para 'x'
+  
+  # gráfico
+  plot = timePlot(dataTime, legendaVar, chave)
+  return(plot)
+}
+```
+
+#Processar dados e gerar gráficos com base em variáveis específicas de um conjunto de dados.
+
+```{r}
+# executar funcao
+dev01 (snis_data, snis_data$AG001_pop_atendida_abastecimento_agua, 'agregar','Pop. com Abastecimento de Água')
+dev01 (snis_data, snis_data$IN022_consumo_percapita_litrohabdia, 'media','Consumo Percapita de Água (l-hab-dia)')
+dev01 (snis_data, snis_data$IN056_indice_de_coleta_esgoto, 'media', 'Índice de Coleta de Esgoto')
+dev01 (snis_data, snis_data$ES005_volume_esgoto_coletado_metro3, 'agregar', 'Volume Esgoto Coletado (m³)')
+```
+ 
